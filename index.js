@@ -138,6 +138,8 @@ bot.on('message', async (msg) => {
         break;   
   }
   
+  bot.on("polling_error", (msg) => console.log(msg));
+  
 });
 
 process.on('uncaughtException', function (error) {
