@@ -1,9 +1,12 @@
 const TelegramBot = require('node-telegram-bot-api');
 const Taller = require('./Models/Talleres');
 const { GetStatusByAppointmentNumber } = require('./Functions/functions');
+require('dotenv').config();
 
-// Reemplaza el valor a continuación con el token de Telegram que obtuviste de @BotFather
-const token = '6479922170:AAE7QzyHVLzH3l5i6Afpr114M-OGJZhESxo';
+
+// Token .env
+const token = process.env.TELEGRAM_TOKEN;
+
 
 // Objeto para mantener el estado de la conversación por número de teléfono
 const conversationState = {};
@@ -61,7 +64,7 @@ bot.on('message', async (msg) => {
           conversationState[chatId] = 'verEstadoTurno';
           break;
         case '3':
-          await bot.sendMessage(chatId, suspensionMartinTaller.schedules);
+          await bot.sendMessage(chatId, bustosFierroTaller.schedules);
           await bot.sendMessage(chatId, 'Desea realizar otra acción?\n1. Volver al menú principal\n2. Finalizar conversación.')
           conversationState[chatId] = 'decisionUsuario';
           break;
@@ -87,10 +90,15 @@ bot.on('message', async (msg) => {
             bot.sendMessage(chatId, 'Ha seleccionado la opción para Ver el estado de un turno! A continuación, ingrese su número de turno');
             conversationState[chatId] = 'verEstadoTurno';
             break;
-          case '3':
-            bot.sendMessage(chatId, 'Hasta la próxima!');
-            delete conversationState[chatId];
-            break;
+            case '3':
+              await bot.sendMessage(chatId, suspensionMartinTaller.schedules);
+              await bot.sendMessage(chatId, 'Desea realizar otra acción?\n1. Volver al menú principal\n2. Finalizar conversación.')
+              conversationState[chatId] = 'decisionUsuario';
+              break;
+            case '4':
+              bot.sendMessage(chatId, 'Hasta la próxima!');
+              delete conversationState[chatId];
+              break;
           default:
             bot.sendMessage(chatId, 'Opción no válida. Por favor, seleccione una opción válida.');
             break;
@@ -129,7 +137,11 @@ bot.on('message', async (msg) => {
         }
         break;   
   }
+  
 });
 
+process.on('uncaughtException', function (error) {
+	console.log("\x1b[31m", "Exception: ", error, "\x1b[0m");
+});
 
 
