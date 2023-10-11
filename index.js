@@ -146,7 +146,3 @@ process.on('uncaughtException', function (error) {
 	console.log("\x1b[31m", "Exception: ", error, "\x1b[0m");
 });
 
-const port = process.env.PORT || 3000; // 3000 es un puerto de ejemplo
-app.listen(port, () => {
-  console.log(`Servidor escuchando en el puerto ${port}`);
-});
