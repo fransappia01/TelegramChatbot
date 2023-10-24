@@ -1,6 +1,6 @@
 const TelegramBot = require('node-telegram-bot-api');
 const Taller = require('./Models/Talleres');
-const { GetStatusByAppointmentNumber } = require('./Functions/functions');
+const { GetStatusByAppointmentNumber, GetWorkshopsByLatLength, GetWorkshops } = require('./Functions/functions');
 require('dotenv').config();
 
 
@@ -10,10 +10,15 @@ const token = process.env.TELEGRAM_TOKEN;
 
 // Objeto para mantener el estado de la conversación por número de teléfono
 const conversationState = {};
+let selectedValues = { selectedWorkshopName: null, currentTaller: null };
+let numeroTallerMap = {};
+
+let currentTaller;
+let selectedWorkshopName;
 
 // Lista de talleres
-const bustosFierroTaller = new Taller('Bustos Fierro Taller', { latitude: -31.3972250, longitude: -64.2048260 },'Horarios de atención al cliente:\n• Lunes a Viernes: de 8:00 a 13:00 hs. \n• Sábados: de 10:00 a  13:00 hs.');
-const suspensionMartinTaller = new Taller('Suspension Martin', { latitude: -30.785494, longitude: -64.2048260 },'Horarios de atención al cliente:\n• Lunes a Viernes: de 8:00 a 17:00 hs. \n• Sábados: de 10:00 a  17:00 hs.');
+const bustosFierroTaller = new Taller('Bustos Fierro Taller','Horarios de atención al cliente:\n• Lunes a Viernes: de 8:00 a 13:00 hs. \n• Sábados: de 10:00 a  13:00 hs.');
+const suspensionMartinTaller = new Taller('Suspension Martin','Horarios de atención al cliente:\n• Lunes a Viernes: de 8:00 a 17:00 hs. \n• Sábados: de 10:00 a  17:00 hs.');
 
 const bot = new TelegramBot(token, { polling: true });
 
@@ -23,82 +28,96 @@ bot.on('message', async (msg) => {
   const userMessage = msg.text;
 
   let userState = conversationState[chatId] || 'start';
-  let currentTaller;
+
+  let workshops = []; 
 
   switch (userState) {
     case 'start':
-      bot.sendMessage(chatId, 'Bienvenido a Tune Up! Elija el taller con el que quiera consultar sus datos:\n1. Bustos Fierro Taller\n2. Suspension Martin\n3. Salir');
-      conversationState[chatId] = 'waitingOption';
+      // Cuando el usuario inicia la conversación, obtén la lista de talleres y envíala enumerada
+      GetWorkshops()
+        .then(async (workshopsData) => {
+
+          workshops = workshopsData; 
+          if (workshops) {
+
+            workshops.forEach((workshop, index) => {
+              numeroTallerMap[index + 1] = workshop.name;
+            });
+
+            // workshops es un array con la lista de talleres
+            let message = 'Bienvenido a Tune Up! Elija el taller con el que quiera consultar sus datos:\n';
+            workshops.forEach((workshop, index) => {
+              message += `${index + 1}. ${workshop.name}\n`;
+            });
+            message += `${workshops.length + 1}. Salir`;
+
+            bot.sendMessage(chatId, message);
+            conversationState[chatId] = 'waitingOption';
+          } else {
+            await bot.sendMessage(chatId, 'No se pudieron obtener la lista de talleres.');
+          }
+        })
+        .catch((error) => {
+          console.error('Error al obtener la lista de talleres:', error);
+        });
       break;
     case 'waitingOption':
-      switch (userMessage) {
-        case '1':
-          bot.sendMessage(chatId, 'Se comunicó con Bustos Fierro Taller, ¿qué operación desea realizar?\n1. Consultar Ubicación\n2. Ver estado del turno\n3. Consultar Horarios de atención al cliente \n4. Salir');
-          currentTaller = bustosFierroTaller;
-          conversationState[chatId] = 'bustosFierro';
-          break;
-        case '2':
-          bot.sendMessage(chatId, 'Se comunicó con Suspension Martin, ¿qué operación desea realizar?\n1. Consultar Ubicación\n2. Ver estado del turno\n3. Consultar Horarios de atención al cliente \n4. Salir');
-          currentTaller = suspensionMartinTaller;
-          conversationState[chatId] = 'suspensionMartin';
-          break;
-        case '3':
-          bot.sendMessage(chatId, '¡Hasta la próxima! ¡Gracias por usar Tune Up!');
-          delete conversationState[chatId];
-          break;
-        default:
+      if (userMessage) {
+          selectedWorkshopName = numeroTallerMap[userMessage];
+        if (selectedWorkshopName) {
+          currentTaller = selectedWorkshopName;
+
+          console.log("wo",selectedWorkshopName)
+          //conversationState[chatId] = selectedWorkshopName;
+          bot.sendMessage(chatId, `Se comunicó con ${selectedWorkshopName}, ¿qué operación desea realizar?\n1. Consultar Ubicación\n2. Ver estado del turno\n3. Consultar Horarios de atención al cliente \n4. Salir`);
+          conversationState[chatId] = 'TallerOpciones';
+          //selectedWorkshopName = numeroTallerMap[userMessage];
+
+        } else {
           bot.sendMessage(chatId, 'Opción no válida. Por favor, seleccione una opción válida.');
-          break;
+        }
+      } else {
+        // Maneja otras acciones o mensajes
       }
-      break;
-    case 'bustosFierro':
-      switch (userMessage) {
-        case '1':
-          await bot.sendMessage(chatId, 'Ha seleccionado la opción para Consultar Ubicación! A continuación, se muestra en el mapa');
-          await bot.sendLocation(chatId, bustosFierroTaller.location.latitude, bustosFierroTaller.location.longitude, { title: bustosFierroTaller.name });
-          await bot.sendMessage(chatId, 'Desea realizar otra acción?\n1. Volver al menú principal\n2. Finalizar conversación.')
-          conversationState[chatId] = 'decisionUsuario';
-          break;
-        case '2':
-          bot.sendMessage(chatId, 'Ha seleccionado la opción para Ver el estado de un turno! A continuación, ingrese su número de turno');
-          conversationState[chatId] = 'verEstadoTurno';
-          break;
-        case '3':
-          await bot.sendMessage(chatId, bustosFierroTaller.schedules);
-          await bot.sendMessage(chatId, 'Desea realizar otra acción?\n1. Volver al menú principal\n2. Finalizar conversación.')
-          conversationState[chatId] = 'decisionUsuario';
-          break;
-        case '4':
-          bot.sendMessage(chatId, 'Hasta la próxima!');
-          delete conversationState[chatId];
-          break;
-        default:
-          bot.sendMessage(chatId, 'Opción no válida. Por favor, seleccione una opción válida.');
-          break;
-      }
+
       break;
 
-      case 'suspensionMartin':
+      case 'TallerOpciones':
         switch (userMessage) {
           case '1':
+
+            if (currentTaller){
+            GetWorkshopsByLatLength(currentTaller)
+            .then(async (coordenates) => {
+              if (coordenates) {
             await bot.sendMessage(chatId, 'Ha seleccionado la opción para Consultar Ubicación! A continuación, se muestra en el mapa');
-            await bot.sendLocation(chatId, suspensionMartinTaller.location.latitude, suspensionMartinTaller.location.longitude, { title: suspensionMartinTaller.name });
+            await bot.sendLocation(chatId, coordenates.latitude, coordenates.length, { title: currentTaller});
             await bot.sendMessage(chatId, 'Desea realizar otra acción?\n1. Volver al menú principal\n2. Finalizar conversación.')
             conversationState[chatId] = 'decisionUsuario';
+              }
+              else{
+                await bot.sendMessage(chatId, 'No se pudieron obtener las coordenadas del taller.');
+                conversationState[chatId] = 'decisionUsuario';
+              }          
+              });
+            }
+            else{
+              return "No llega el nombre del taller";
+            }
             break;
           case '2':
             bot.sendMessage(chatId, 'Ha seleccionado la opción para Ver el estado de un turno! A continuación, ingrese su número de turno');
             conversationState[chatId] = 'verEstadoTurno';
             break;
-            case '3':
-              await bot.sendMessage(chatId, suspensionMartinTaller.schedules);
-              await bot.sendMessage(chatId, 'Desea realizar otra acción?\n1. Volver al menú principal\n2. Finalizar conversación.')
-              conversationState[chatId] = 'decisionUsuario';
-              break;
-            case '4':
-              bot.sendMessage(chatId, 'Hasta la próxima!');
-              delete conversationState[chatId];
-              break;
+          case '3':
+            await bot.sendMessage(chatId, bustosFierroTaller.schedules);
+            await bot.sendMessage(chatId, 'Desea realizar otra acción?\n1. Volver al menú principal\n2. Finalizar conversación.')
+            conversationState[chatId] = 'decisionUsuario';
+            break;
+          case '4':
+            bot.sendMessage(chatId, 'Hasta la próxima!');
+            delete conversationState[chatId];
+            break;
           default:
             bot.sendMessage(chatId, 'Opción no válida. Por favor, seleccione una opción válida.');
             break;
@@ -145,4 +164,3 @@ bot.on('message', async (msg) => {
 process.on('uncaughtException', function (error) {
 	console.log("\x1b[31m", "Exception: ", error, "\x1b[0m");
 });
-

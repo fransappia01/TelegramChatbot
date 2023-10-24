@@ -118,9 +118,93 @@ async function GetAppointmentNumber(number) {
   });
 
 }
+
+
+
+ // Funcion para traer coordenadas por nombre del Taller
+ 
+ async function GetWorkshopsByLatLength(name) {
+  // Configurar la URL de la API y los datos de la solicitud
+  const url = `https://tuneupapp.somee.com/api/Taller/WorkshopsByLatLength?name=${name}`;
+
+
+  try {
+    // Importar dinámicamente el módulo node-fetch
+    const { default: fetch } = await import('node-fetch');
+
+    // Realizar la solicitud GET a la API utilizando fetch
+    const rawResponse = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json'
+      },
+      agent: new Agent({ rejectUnauthorized: false })
+    });
+
+    // Verificar el estado de la respuesta
+    if (rawResponse.ok) {
+      // Obtener el nombre del taller de la respuesta
+      const coordenates = await rawResponse.json();
+
+      console.log('Response from API:', coordenates); 
+      return coordenates;
+      
+    } else {
+      console.error('Error al realizar la solicitud. Estado:', rawResponse.status);
+      return null;
+    }
+  } catch (error) {
+    console.error('Error al realizar la solicitud:', error);
+    return null;
+  }
+}
+
+
+ // Funcion para traer todos los talleres
+ 
+ async function GetWorkshops() {
+  // Configurar la URL de la API y los datos de la solicitud
+  const url = `https://tuneupapp.somee.com/api/Taller/Workshops`;
+
+
+  try {
+    // Importar dinámicamente el módulo node-fetch
+    const { default: fetch } = await import('node-fetch');
+
+    // Realizar la solicitud GET a la API utilizando fetch
+    const rawResponse = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json'
+      },
+      agent: new Agent({ rejectUnauthorized: false })
+    });
+
+    // Verificar el estado de la respuesta
+    if (rawResponse.ok) {
+      // Obtener el nombre del taller de la respuesta
+      const workshops = await rawResponse.json();
+
+      console.log('Response from API:', workshops); 
+      return workshops;
+      
+    } else {
+      console.error('Error al realizar la solicitud. Estado:', rawResponse.status);
+      return null;
+    }
+  } catch (error) {
+    console.error('Error al realizar la solicitud:', error);
+    return null;
+  }
+}
+
   module.exports = {
     getSMS,
     getWorkshopNameByPhone,
     GetStatusByAppointmentNumber,
-    GetAppointmentNumber
+    GetAppointmentNumber,
+    GetWorkshopsByLatLength,
+    GetWorkshops
   };
