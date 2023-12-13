@@ -200,11 +200,149 @@ async function GetAppointmentNumber(number) {
   }
 }
 
+// Funcion que valida el id del chat
+
+async function GetChatIdById(chatId) {
+  // Configurar la URL de la API y los datos de la solicitud
+  const url = `https://www.tuneupapp.somee.com/api/ChatsData/GetChatIdById?chat_id=${chatId}`;
+
+
+  try {
+    // Importar dinámicamente el módulo node-fetch
+    const { default: fetch } = await import('node-fetch');
+
+    // Realizar la solicitud GET a la API utilizando fetch
+    const rawResponse = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json'
+      },
+      agent: new Agent({ rejectUnauthorized: false })
+    });
+
+    // Verificar el estado de la respuesta
+    if (rawResponse.ok) {
+      // Obtener el nombre del taller de la respuesta
+      const chat = await rawResponse.json();
+
+      return chat;
+      
+    } else {
+      console.error('Error al realizar la solicitud. Estado:', rawResponse.status);
+      return null;
+    }
+  } catch (error) {
+    console.error('Error al realizar la solicitud:', error);
+    return null;
+  }
+}
+
+// Función para validar mail del usuario
+async function ValidateUserEmail(email) {
+  const url = `https://www.tuneupapp.somee.com/api/ChatsData/ValidateUserEmail?email=${email}`;
+
+  try {
+    const { default: fetch } = await import('node-fetch');
+    const rawResponse = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json'
+      },
+      agent: new Agent({ rejectUnauthorized: false })
+    });
+
+    if (rawResponse.ok) {
+      const result = await rawResponse.json();
+
+      return result; 
+    } else {
+      console.error('Error al validar el correo electrónico. Estado:', rawResponse.status);
+      return false;
+    }
+  } catch (error) {
+    console.error('Error al realizar la solicitud:', error);
+    return null;
+  }
+}
+
+// Función para crear el ChatId en la base de datos
+async function CreateChatId(email, chatId) {
+  const url = `https://www.tuneupapp.somee.com/api/ChatsData/CreateChatId?email=${email}&chatId=${chatId}`;
+
+  try {
+    const { default: fetch } = await import('node-fetch');
+    const rawResponse = await fetch(url, {
+      method: 'POST',  // Dependiendo de la API, podría ser necesario cambiar a POST
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json'
+      },
+      agent: new Agent({ rejectUnauthorized: false })
+    });
+
+    if (rawResponse.ok) {
+      const result = await rawResponse.json();
+      return result
+    } else {
+      console.error('Error al crear el ChatId. Estado:', rawResponse.status);
+      return null;
+    }
+  } catch (error) {
+    console.error('Error al realizar la solicitud:', error);
+    return null;
+  }
+}
+
+// Funcion que trae el nombre del usuario a partir del chatId
+
+async function GetUserNameByChatId(chatId) {
+  // Configurar la URL de la API y los datos de la solicitud
+  const url = `https://www.tuneupapp.somee.com/api/ChatsData/GetUserNameByChatId?chat_id=${chatId}`;
+
+
+  try {
+    // Importar dinámicamente el módulo node-fetch
+    const { default: fetch } = await import('node-fetch');
+
+    // Realizar la solicitud GET a la API utilizando fetch
+    const rawResponse = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json'
+      },
+      agent: new Agent({ rejectUnauthorized: false })
+    });
+
+    // Verificar el estado de la respuesta
+    if (rawResponse.ok) {
+      // Obtener el nombre del taller de la respuesta
+      const chat = await rawResponse.json();
+
+      return chat;
+      
+    } else {
+      console.error('Error al realizar la solicitud. Estado:', rawResponse.status);
+      return null;
+    }
+  } catch (error) {
+    console.error('Error al realizar la solicitud:', error);
+    return null;
+  }
+}
+
+
   module.exports = {
     getSMS,
     getWorkshopNameByPhone,
     GetStatusByAppointmentNumber,
     GetAppointmentNumber,
     GetWorkshopsByLatLength,
-    GetWorkshops
+    GetWorkshops,
+    GetChatIdById,
+    ValidateUserEmail,
+    CreateChatId,
+    GetUserNameByChatId
   };

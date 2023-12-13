@@ -1,6 +1,6 @@
 const TelegramBot = require('node-telegram-bot-api');
 const Taller = require('./Models/Talleres');
-const { GetStatusByAppointmentNumber, GetWorkshopsByLatLength, GetWorkshops } = require('./Functions/functions');
+const { GetStatusByAppointmentNumber, GetWorkshopsByLatLength, GetWorkshops, GetChatIdById, ValidateUserEmail, CreateChatId, GetUserNameByChatId } = require('./Functions/functions');
 require('dotenv').config();
 
 
@@ -24,16 +24,53 @@ const bot = new TelegramBot(token, { polling: true });
 
 // Escucha cualquier tipo de mensaje
 bot.on('message', async (msg) => {
+
   const chatId = msg.chat.id;
   const userMessage = msg.text;
+  console.log(chatId);
+
+    //validar primer chat
+  var validateFirstChat = await GetChatIdById(chatId);
 
   let userState = conversationState[chatId] || 'start';
 
   let workshops = []; 
 
+
+  // 1.  Validacion de primer chat
+  // Caso de uso de primer chat
+  // usuario habla, bot responde "Bievenido..., solicita mail" , consume endpoint https://www.tuneupapp.somee.com/api/ChatsData/ValidateUserEmail?email=
+  // si devuelve true la validacion, consumo este endpoint https://www.tuneupapp.somee.com/api/ChatsData/CreateChatId?email=&chatId=  POST
+  // consumir endpoint de talleres asginados a ese usuario (revisar)
+  // seguir el flujo comun del bot
+
+  // caso de uso distinto de primer chat
+  // traer el chat id, getChatid, siempre es true
+  // consumir endpoint GetchatById
+  // seguir con el flujo del bot
+
   switch (userState) {
     case 'start':
-      // Cuando el usuario inicia la conversación, obtén la lista de talleres y envíala enumerada
+
+     // Ahora empieza con la validacion del mail en primer lugar
+
+     if (validateFirstChat){
+      //aca no es el primer chat
+
+      var username = await GetUserNameByChatId(chatId);
+      bot.sendMessage(chatId, `Bienvenido nuevamente a TuneUp, ${username}!`);
+
+  
+    }
+    else{
+      //aca seria primer chat
+      bot.sendMessage(chatId, 'Bienvenido por primera vez a TuneUp!\n A continuación te solicitamos tu mail para verificar que estas registrado en nuestra aplicación.');
+      conversationState[chatId] = 'waitingUserEmail';
+      break;
+    }
+    
+
+      // Cuando el usuario ya esta verificado, se obtiene la lista de talleres enumerada
       GetWorkshops()
         .then(async (workshopsData) => {
 
@@ -61,9 +98,20 @@ bot.on('message', async (msg) => {
           console.error('Error al obtener la lista de talleres:', error);
         });
       break;
+
     case 'waitingOption':
-      if (userMessage) {
+
+    console.log(userMessage);
+
+      if(userMessage === '17'){
+        bot.sendMessage(chatId, 'Hasta la próxima!! Para comenzar otro chat envie nuevamente un mensaje.');
+        delete conversationState[chatId];
+      
+      }else {
           selectedWorkshopName = numeroTallerMap[userMessage];
+
+
+          // ESTO AHORA ES LUEGO DE LA VALIDACION CUANDO SELECCIONE UN TALLER
         if (selectedWorkshopName) {
           currentTaller = selectedWorkshopName;
 
@@ -76,8 +124,6 @@ bot.on('message', async (msg) => {
         } else {
           bot.sendMessage(chatId, 'Opción no válida. Por favor, seleccione una opción válida.');
         }
-      } else {
-        // Maneja otras acciones o mensajes
       }
 
       break;
@@ -140,10 +186,65 @@ bot.on('message', async (msg) => {
         }
         break;
 
+        case 'waitingUserEmail':
+          switch(userMessage){
+            default:
+                //logica cuando usuario manda email
+                const email = userMessage;
+
+                const isEmailValid = await ValidateUserEmail(email);
+
+                if (isEmailValid) {
+                  // El correo electrónico es válido
+                  bot.sendMessage(chatId, '¡Correo electrónico validado con éxito!');
+
+                  const createdChatId = await CreateChatId(email, chatId);
+
+                    if (createdChatId) {
+                      bot.sendMessage(chatId, `ChatId guardado en la base de datos`);
+                    } else {
+                      bot.sendMessage(chatId, 'No se pudo crear el ChatId. Por favor, inténtalo de nuevo.');
+                    }
+                  conversationState[chatId] = 'start';  // Cambiar el estado para seguir con el flujo del bot
+
+                } else {
+                  // El correo electrónico no es válido
+                  bot.sendMessage(chatId, 'El correo electrónico no es válido. Por favor, inténtalo de nuevo.');
+                  conversationState[chatId] = 'waitingUserEmail'
+                  
+                }
+            }
+            break; 
+
       case 'decisionUsuario':
         switch (userMessage) {
           case '1':
-            bot.sendMessage(chatId, 'Bienvenido de nuevo al menú principal! Elija el taller con el que quiera consultar sus datos:\n1. Bustos Fierro Taller\n2. Suspension Martin\n3. Salir');
+               GetWorkshops()
+        .then(async (workshopsData) => {
+
+          workshops = workshopsData; 
+          if (workshops) {
+
+            workshops.forEach((workshop, index) => {
+              numeroTallerMap[index + 1] = workshop.name;
+            });
+
+            // workshops es un array con la lista de talleres
+            let message = 'Bienvenido a Tune Up! Elija el taller con el que quiera consultar sus datos:\n';
+            workshops.forEach((workshop, index) => {
+              message += `${index + 1}. ${workshop.name}\n`;
+            });
+            message += `${workshops.length + 1}. Salir`;
+
+            bot.sendMessage(chatId, message);
+            conversationState[chatId] = 'waitingOption';
+          } else {
+            await bot.sendMessage(chatId, 'No se pudieron obtener la lista de talleres.');
+          }
+        })
+        .catch((error) => {
+          console.error('Error al obtener la lista de talleres:', error);
+        });
             conversationState[chatId] = 'waitingOption';
             break;
           case '2':

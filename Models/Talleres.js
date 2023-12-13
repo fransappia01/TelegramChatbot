@@ -1,9 +1,8 @@
 // Modelo Taller
 
 class Taller {
-    constructor(name, location, schedules) {
+    constructor(name, schedules) {
       this.name = name;
-      this.location = location;
       this.schedules = schedules; //horarios
       this.conversationState = {};
     }

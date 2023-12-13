@@ -1,178 +1,238 @@
 const TelegramBot = require('node-telegram-bot-api');
-const { GetStatusByAppointmentNumber } = require('./Functions/functions');
 const Taller = require('./Models/Talleres');
+const { GetStatusByAppointmentNumber, GetWorkshopsByLatLength, GetWorkshops, GetChatIdById } = require('./Functions/functions');
+require('dotenv').config();
 
-// replace the value below with the Telegram token you receive from @BotFather
-const token = '6479922170:AAE7QzyHVLzH3l5i6Afpr114M-OGJZhESxo';
+
+// Token .env
+const token = process.env.TELEGRAM_TOKEN;
+
 
 // Objeto para mantener el estado de la conversación por número de teléfono
 const conversationState = {};
+let selectedValues = { selectedWorkshopName: null, currentTaller: null };
+let numeroTallerMap = {};
 
-// Lista de tallers
+let currentTaller;
+let selectedWorkshopName;
 
-const bustosFierroTaller = new Taller('Bustos Fierro Taller', { latitude: -31.3972250, longitude: -64.2048260 });
-const suspensionMartinTaller = new Taller('Suspension Martin', { latitude: -30.785494, longitude: -64.2048260 });
+// Lista de talleres
+const bustosFierroTaller = new Taller('Bustos Fierro Taller','Horarios de atención al cliente:\n• Lunes a Viernes: de 8:00 a 13:00 hs. \n• Sábados: de 10:00 a  13:00 hs.');
+const suspensionMartinTaller = new Taller('Suspension Martin','Horarios de atención al cliente:\n• Lunes a Viernes: de 8:00 a 17:00 hs. \n• Sábados: de 10:00 a  17:00 hs.');
 
-const bot = new TelegramBot(token, {polling: true});
+const bot = new TelegramBot(token, { polling: true });
 
-// Matches "/echo [whatever]" 
-bot.onText(/\/echo (.+)/, (msg, match) => {
-//   'msg' is the received Message from Telegram
-//   'match' is the result of executing the regexp above on the text content
-//   of the message
-
-   const chatId = msg.chat.id;
-   const resp = match[1]; // the captured "whatever"
-
-//   send back the matched "whatever" to the chat
-   bot.sendMessage(chatId, resp);
- });
-
-
-
-// Listen for any kind of message. There are different kinds of messages.
+// Escucha cualquier tipo de mensaje
 bot.on('message', async (msg) => {
+
   const chatId = msg.chat.id;
+  const userMessage = msg.text;
+  console.log(chatId);
 
-  console.log(msg)
+    //validar primer chat
+  var validateFirstChat = await GetChatIdById(chatId);
 
-    const userMessage = msg.text;
+  if (validateFirstChat){
+    //aca no es el primer chat
 
-    let userState = conversationState[chatId] || 'start';
-    let currentTaller;
+  }
+  else{
+    //aca seria primer chat
+    bot.sendMessage(chatId, 'Bienvenido por primera vez a TuneUp! A continuación te solicitamos tu mail para verificar que estas registrado en nuestra aplicación.');
+  }
+  
 
-    if (userState === 'start') {
-      const options = {
-        reply_markup: {
-          keyboard: [
-            [{ text: '1. Bustos Fierro Taller' }],
-            [{ text: '2. Suspension Martin' }],
-            [{ text: '3. Salir' }]
-          ],
-          resize_keyboard: true,
-          one_time_keyboard: true
-        }
-      };
-      bot.sendMessage(chatId, 'Bienvenido a Tune Up! Elija el taller con el que quiera consultar sus datos: ', options);
-      conversationState[chatId] = 'waitingOption';
+  let userState = conversationState[chatId] || 'start';
 
-    } else if (userState === 'waitingOption') {
-      switch (userMessage) {
-        case '1. Bustos Fierro Taller':
-          bot.sendMessage(chatId, 'Se comunicó con Bustos Fierro Taller, ¿qué operación desea realizar?\n1. Consultar Ubicación\n2. Ver estado del turno\n3. Salir');
-          currentTaller = bustosFierroTaller;
-          conversationState[chatId] = 'bustosFierro';
-          break;
-        case '2. Suspension Martin':
-          bot.sendMessage(chatId, 'Se comunicó con Suspension Martin, ¿qué operación desea realizar?\n1. Cancelar un turno\n2. Ver estado del turno\n3. Salir');
-          currentTaller = suspensionMartinTaller;
-          conversationState[chatId] = 'suspensionMartin';
-          break;
-        case '3':
-          bot.sendMessage(chatId, '¡Hasta la próxima! ¡Gracias por usar Tune Up!');
-          delete conversationState[chatId];
-          break;
-        default:
-          bot.sendMessage(chatId, 'Opción no válida. Por favor, seleccione una opción válida.');
-      }
-    } else if (userState === 'bustosFierro') {          
-      switch(userMessage) {
-        case '1':
-        bot.sendMessage(chatId, 'Ha seleccionado la opción para Consultar Ubicación! A continuación, se muestra en el mapa');
-        // Puedes enviar la ubicación como una respuesta
-        bot.sendLocation(chatId, -31.3972250, -64.2048260, { title: 'Bustos Fierro Taller' });
-        break;
-        case '2': 
-        bot.sendMessage(chatId, 'Ha seleccionado la opción para Ver el estado de un turno! A continuación, ingrese su numero de turno');
-        conversationState[chatId] = 'verEstadoTurno';
+  let workshops = []; 
 
-          if (conversationState[chatId] === 'verEstadoTurno' ) {
 
-            bot.on('message', async (msg) => {
-            const userAppointment = msg.text;
-            //console.log(userAppointment, "turno");
+  // 1.  Validacion de primer chat
+  // Caso de uso de primer chat
+  // usuario habla, bot responde "Bievenido..., solicita mail" , consume endpoint https://www.tuneupapp.somee.com/api/ChatsData/ValidateUserEmail?email=
+  // si devuelve true la validacion, consumo este endpoint https://www.tuneupapp.somee.com/api/ChatsData/CreateChatId?email=&chatId=
+  // consumir endpoint de talleres asginados a ese usuario (revisar)
+  // seguir el flujo comun del bot
 
-            const appointment_status = await GetStatusByAppointmentNumber(userAppointment);
+  // caso de uso distinto de primer chat
+  // traer el caht id, getChatid, siempre es true
+  // consumir endpoint GetchatById
+  // seguir con el flujo del bot
 
-            console.log(appointment_status);
+  switch (userState) {
+    case 'start':
 
-            if (appointment_status) {
-                await bot.sendMessage(chatId, `Aguanta un momento por favor...`);
+     // Ahora empieza con la validacion del mail en primer lugar
 
-                await bot.sendMessage(chatId, `El estado de tu turno es: ${appointment_status}`);
-                await bot.sendMessage(chatId, '¿Desea realizar otra acción?\n1. Volver al menú principal\n2. Finalizar conversación');
 
-                conversationState[chatId] = 'VolverOFInalizar';
-              } else {
-                await bot.sendMessage(chatId, 'El numero de turno no se encuentra registrado. Por favor ingrese un numero de turno válido.');
-                //askForNextAction(chatId, 'bustosFierro');
-              }
-             
-                if (conversationState[chatId]  === 'VolverOFInalizar'){
-                
-                  const userChoice = msg.text;
 
-                    switch(userChoice) {
-                      case '1':
-                        await bot.sendMessage(chatId, 'Volviste al menu');
-                        delete conversationState[chatId];
-                        break;
-                      case '2':
-                        await bot.sendMessage(chatId, 'Saliste');
-                        delete conversationState[chatId];
-                        break;
-                    }
-                  
-                }
-                
+
+
+
+
+
+      // Cuando el usuario inicia la conversación, se obtiene la lista de talleres enumerada
+      GetWorkshops()
+        .then(async (workshopsData) => {
+
+          workshops = workshopsData; 
+          if (workshops) {
+
+            workshops.forEach((workshop, index) => {
+              numeroTallerMap[index + 1] = workshop.name;
             });
-                      
-        break;
+
+            // workshops es un array con la lista de talleres
+            let message = 'Bienvenido a Tune Up! Elija el taller con el que quiera consultar sus datos:\n';
+            workshops.forEach((workshop, index) => {
+              message += `${index + 1}. ${workshop.name}\n`;
+            });
+            message += `${workshops.length + 1}. Salir`;
+
+            bot.sendMessage(chatId, message);
+            conversationState[chatId] = 'waitingOption';
+          } else {
+            await bot.sendMessage(chatId, 'No se pudieron obtener la lista de talleres.');
           }
-        case '3':
-        bot.sendMessage(chatId, 'Hasta la próxima!');
+        })
+        .catch((error) => {
+          console.error('Error al obtener la lista de talleres:', error);
+        });
+      break;
+
+    case 'waitingOption':
+
+    console.log(userMessage);
+
+      if(userMessage === '17'){
+        bot.sendMessage(chatId, 'Hasta la próxima!! Para comenzar otro chat envie nuevamente un mensaje.');
         delete conversationState[chatId];
-        break;
-        default:
-        bot.sendMessage(chatId, 'Opción no válida. Por favor, seleccione una opción válida.');
-        break;
-      }
-    } else if (userState === 'suspensionMartin') {
-      switch(userMessage){
-        case '1':
-        bot.sendMessage(chatId, 'Ha seleccionado la opción para Consultar Ubicación! A continuación, se muestra en el mapa');
-        // Puedes enviar la ubicación como una respuesta
-        bot.sendLocation(chatId, -30.785494, -64.2048260, { title: 'Suspensión Martin' });
-        break;
-        case '2':
-        bot.sendMessage(chatId, 'Ha seleccionado la opción para Ver el estado de un turno! A continuación, ingrese su numero de turno');
-        conversationState[chatId] = 'verEstadoTurno';
-
-        bot.on('message', async (msg) => {
-
-          const userAppointment = msg.text;
-          console.log(userAppointment, "turno");
-
-          const appointment_status = await GetStatusByAppointmentNumber(userAppointment);
-
-          if (appointment_status) {
-              await bot.sendMessage(msg.from, `El estado de tu turno es: ${appointment_status}`);
-            } else {
-              await bot.sendMessage(msg.from, 'El numero de turno no se encuentra registrado.');
-            }
       
-          delete conversationState[chatId];
-              
-          });
-        break;
-        case '3':
-        bot.sendMessage(chatId, 'Hasta la próxima!');
-        delete conversationState[chatId];
-        break;
-        default:
-        bot.sendMessage(chatId, 'Opción no válida. Por favor, seleccione una opción válida.');
-        break;
+      }else {
+          selectedWorkshopName = numeroTallerMap[userMessage];
+
+
+          // ESTO AHORA ES LUEGO DE LA VALIDACION CUANDO SELECCIONE UN TALLER
+        if (selectedWorkshopName) {
+          currentTaller = selectedWorkshopName;
+
+          console.log("wo",selectedWorkshopName)
+          //conversationState[chatId] = selectedWorkshopName;
+          bot.sendMessage(chatId, `Se comunicó con ${selectedWorkshopName}, ¿qué operación desea realizar?\n1. Consultar Ubicación\n2. Ver estado del turno\n3. Consultar Horarios de atención al cliente \n4. Salir`);
+          conversationState[chatId] = 'TallerOpciones';
+          //selectedWorkshopName = numeroTallerMap[userMessage];
+
+        } else {
+          bot.sendMessage(chatId, 'Opción no válida. Por favor, seleccione una opción válida.');
+        }
       }
-    }
+
+      break;
+
+      case 'TallerOpciones':
+        switch (userMessage) {
+          case '1':
+
+            if (currentTaller){
+            GetWorkshopsByLatLength(currentTaller)
+            .then(async (coordenates) => {
+              if (coordenates) {
+            await bot.sendMessage(chatId, 'Ha seleccionado la opción para Consultar Ubicación! A continuación, se muestra en el mapa');
+            await bot.sendLocation(chatId, coordenates.latitude, coordenates.length, { title: currentTaller});
+            await bot.sendMessage(chatId, 'Desea realizar otra acción?\n1. Volver al menú principal\n2. Finalizar conversación.')
+            conversationState[chatId] = 'decisionUsuario';
+              }
+              else{
+                await bot.sendMessage(chatId, 'No se pudieron obtener las coordenadas del taller.');
+                conversationState[chatId] = 'decisionUsuario';
+              }          
+              });
+            }
+            else{
+              return "No llega el nombre del taller";
+            }
+            break;
+          case '2':
+            bot.sendMessage(chatId, 'Ha seleccionado la opción para Ver el estado de un turno! A continuación, ingrese su número de turno');
+            conversationState[chatId] = 'verEstadoTurno';
+            break;
+          case '3':
+            await bot.sendMessage(chatId, bustosFierroTaller.schedules);
+            await bot.sendMessage(chatId, 'Desea realizar otra acción?\n1. Volver al menú principal\n2. Finalizar conversación.')
+            conversationState[chatId] = 'decisionUsuario';
+            break;
+          case '4':
+            bot.sendMessage(chatId, 'Hasta la próxima!');
+            delete conversationState[chatId];
+            break;
+          default:
+            bot.sendMessage(chatId, 'Opción no válida. Por favor, seleccione una opción válida.');
+            break;
+        }
+        break;
+
+      case 'verEstadoTurno':
+        switch(userMessage){
+          default:
+          const number = msg.text;
+          const appointmentStatus = await GetStatusByAppointmentNumber(number);
+
+          if (appointmentStatus) {
+            await bot.sendMessage(chatId, `El estado de tu turno es: ${appointmentStatus}`);
+            await bot.sendMessage(chatId, 'Desea realizar otra acción?\n1. Volver al menú principal\n2. Finalizar conversación.')
+            conversationState[chatId] = 'decisionUsuario';
+          } else {
+            await bot.sendMessage(chatId, 'El número de turno no se encuentra registrado o es inválido. Por favor, ingrese un numero de turno válido.');
+          }
+        }
+        break;
+
+      case 'decisionUsuario':
+        switch (userMessage) {
+          case '1':
+               GetWorkshops()
+        .then(async (workshopsData) => {
+
+          workshops = workshopsData; 
+          if (workshops) {
+
+            workshops.forEach((workshop, index) => {
+              numeroTallerMap[index + 1] = workshop.name;
+            });
+
+            // workshops es un array con la lista de talleres
+            let message = 'Bienvenido a Tune Up! Elija el taller con el que quiera consultar sus datos:\n';
+            workshops.forEach((workshop, index) => {
+              message += `${index + 1}. ${workshop.name}\n`;
+            });
+            message += `${workshops.length + 1}. Salir`;
+
+            bot.sendMessage(chatId, message);
+            conversationState[chatId] = 'waitingOption';
+          } else {
+            await bot.sendMessage(chatId, 'No se pudieron obtener la lista de talleres.');
+          }
+        })
+        .catch((error) => {
+          console.error('Error al obtener la lista de talleres:', error);
+        });
+            conversationState[chatId] = 'waitingOption';
+            break;
+          case '2':
+            bot.sendMessage(chatId, 'Nos vemos la próxima! Para iniciar una nueva conversación, simplemente envíe un mensaje.');
+            delete conversationState[chatId];
+            break;
+          default:
+            bot.sendMessage(chatId, 'Opción no válida. Por favor, seleccione una opción válida.');
+            break;
+        }
+        break;   
+  }
+  
+  bot.on("polling_error", (msg) => console.log(msg));
+
 });
 
+process.on('uncaughtException', function (error) {
+	console.log("\x1b[31m", "Exception: ", error, "\x1b[0m");
+});
