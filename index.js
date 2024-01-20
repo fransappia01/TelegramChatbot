@@ -4,7 +4,7 @@ const { GetStatusByAppointmentNumber, GetWorkshopsByLatLength, GetWorkshops, Get
 require('dotenv').config();
 
 
-// Token .env
+//Token .env
 const token = process.env.TELEGRAM_TOKEN;
 
 
