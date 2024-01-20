@@ -2,7 +2,7 @@ const { Agent } = require('https');
  
  // Funcion para traer politicas y privacidad de cada Taller por nombre de taller
  
- async function getSMS(phone, workshopName) {
+ async function GetSMSByWorkshop(phone, workshopName) {
     // Configurar la URL de la API y los datos de la solicitud
     const url = 'https://tuneupapp.somee.com/api/Sms/GetSmsByWorkshop';
     const data = { phone, name: workshopName};
@@ -334,8 +334,48 @@ async function GetUserNameByChatId(chatId) {
 }
 
 
+// Funcion que trae la lista de talleres con los que interactuo el usuario
+
+async function GetTalleresByInteraction(chatId) {
+  // Configurar la URL de la API y los datos de la solicitud
+  const url = `https://www.tuneupapp.somee.com/api/ChatsData/GetTalleresByInteraccion?chat_id=${chatId}`;
+
+
+  try {
+    // Importar dinámicamente el módulo node-fetch
+    const { default: fetch } = await import('node-fetch');
+
+    // Realizar la solicitud GET a la API utilizando fetch
+    const rawResponse = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json'
+      },
+      agent: new Agent({ rejectUnauthorized: false })
+    });
+
+    // Verificar el estado de la respuesta
+    if (rawResponse.ok) {
+      // Obtener el nombre del taller de la respuesta
+      const workshops = await rawResponse.json();
+
+      console.log('Response from API:', workshops); 
+      return workshops;
+      
+    } else {
+      console.error('Error al realizar la solicitud. Estado:', rawResponse.status);
+      return null;
+    }
+  } catch (error) {
+    console.error('Error al realizar la solicitud:', error);
+    return null;
+  }
+}
+
+
   module.exports = {
-    getSMS,
+    GetSMSByWorkshop,
     getWorkshopNameByPhone,
     GetStatusByAppointmentNumber,
     GetAppointmentNumber,
@@ -344,5 +384,6 @@ async function GetUserNameByChatId(chatId) {
     GetChatIdById,
     ValidateUserEmail,
     CreateChatId,
-    GetUserNameByChatId
+    GetUserNameByChatId,
+    GetTalleresByInteraction
   };

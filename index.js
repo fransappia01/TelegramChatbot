@@ -1,6 +1,6 @@
 const TelegramBot = require('node-telegram-bot-api');
 const Taller = require('./Models/Talleres');
-const { GetStatusByAppointmentNumber, GetWorkshopsByLatLength, GetWorkshops, GetChatIdById, ValidateUserEmail, CreateChatId, GetUserNameByChatId } = require('./Functions/functions');
+const { GetStatusByAppointmentNumber, GetWorkshopsByLatLength, GetWorkshops, GetChatIdById, ValidateUserEmail, CreateChatId, GetUserNameByChatId, GetTalleresByInteraction, getSMSbyWorkshop } = require('./Functions/functions');
 require('dotenv').config();
 
 
@@ -12,13 +12,10 @@ const token = process.env.TELEGRAM_TOKEN;
 const conversationState = {};
 let selectedValues = { selectedWorkshopName: null, currentTaller: null };
 let numeroTallerMap = {};
+let workshopNames = [];
 
 let currentTaller;
 let selectedWorkshopName;
-
-// Lista de talleres
-const bustosFierroTaller = new Taller('Bustos Fierro Taller','Horarios de atención al cliente:\n• Lunes a Viernes: de 8:00 a 13:00 hs. \n• Sábados: de 10:00 a  13:00 hs.');
-const suspensionMartinTaller = new Taller('Suspension Martin','Horarios de atención al cliente:\n• Lunes a Viernes: de 8:00 a 17:00 hs. \n• Sábados: de 10:00 a  17:00 hs.');
 
 const bot = new TelegramBot(token, { polling: true });
 
@@ -64,52 +61,50 @@ bot.on('message', async (msg) => {
     }
     else{
       //aca seria primer chat
-      bot.sendMessage(chatId, 'Bienvenido por primera vez a TuneUp!\n A continuación te solicitamos tu mail para verificar que estas registrado en nuestra aplicación.');
+      bot.sendMessage(chatId, 'Bienvenido por primera vez a TuneUp!\nA continuación te solicitamos tu mail para verificar que estas registrado en nuestra aplicación.');
       conversationState[chatId] = 'waitingUserEmail';
       break;
     }
     
 
-      // Cuando el usuario ya esta verificado, se obtiene la lista de talleres enumerada
-      GetWorkshops()
-        .then(async (workshopsData) => {
+          // Cuando el usuario ya está verificado, se obtiene la lista de talleres enumerada
+      GetTalleresByInteraction(chatId)
+      .then(async (workshopNames) => {
+        if (workshopNames && workshopNames.length > 0) {
+          workshopNames.forEach((workshopName, index) => {
+            numeroTallerMap[index + 1] = workshopName;
+          });
 
-          workshops = workshopsData; 
-          if (workshops) {
+          // workshopNames es un array con los nombres de los talleres
+          let message = 'A continuación, elija el taller con el que quiera consultar sus datos:\n';
+          workshopNames.forEach((workshopName, index) => {
+            message += `${index + 1}. ${workshopName}\n\n`;
+          });
+          message += `Para salir o terminar la conversación, simplemente escriba "salir".`;
 
-            workshops.forEach((workshop, index) => {
-              numeroTallerMap[index + 1] = workshop.name;
-            });
-
-            // workshops es un array con la lista de talleres
-            let message = 'Bienvenido a Tune Up! Elija el taller con el que quiera consultar sus datos:\n';
-            workshops.forEach((workshop, index) => {
-              message += `${index + 1}. ${workshop.name}\n`;
-            });
-            message += `${workshops.length + 1}. Salir`;
-
-            bot.sendMessage(chatId, message);
-            conversationState[chatId] = 'waitingOption';
-          } else {
-            await bot.sendMessage(chatId, 'No se pudieron obtener la lista de talleres.');
-          }
-        })
-        .catch((error) => {
-          console.error('Error al obtener la lista de talleres:', error);
-        });
+          bot.sendMessage(chatId, message);
+          conversationState[chatId] = 'waitingOption';
+        } else {
+          await bot.sendMessage(chatId, 'No se pudieron obtener la lista de talleres.');
+        }
+      })
+      .catch((error) => {
+        console.error('Error al obtener la lista de talleres:', error);
+      });
       break;
 
     case 'waitingOption':
 
     console.log(userMessage);
 
-      if(userMessage === '17'){
+    if (userMessage.toLowerCase() === 'salir'){
         bot.sendMessage(chatId, 'Hasta la próxima!! Para comenzar otro chat envie nuevamente un mensaje.');
         delete conversationState[chatId];
       
       }else {
           selectedWorkshopName = numeroTallerMap[userMessage];
 
+          console.log('selectedWorkshopName:', selectedWorkshopName); 
 
           // ESTO AHORA ES LUEGO DE LA VALIDACION CUANDO SELECCIONE UN TALLER
         if (selectedWorkshopName) {
@@ -156,7 +151,7 @@ bot.on('message', async (msg) => {
             conversationState[chatId] = 'verEstadoTurno';
             break;
           case '3':
-            await bot.sendMessage(chatId, bustosFierroTaller.schedules);
+            await bot.sendMessage(chatId,'Horarios de atención al cliente:\n• Lunes a Viernes: de 8:00 a 17:00 hs. \n• Sábados: de 10:00 a  17:00 hs.')
             await bot.sendMessage(chatId, 'Desea realizar otra acción?\n1. Volver al menú principal\n2. Finalizar conversación.')
             conversationState[chatId] = 'decisionUsuario';
             break;
@@ -201,9 +196,9 @@ bot.on('message', async (msg) => {
                   const createdChatId = await CreateChatId(email, chatId);
 
                     if (createdChatId) {
-                      bot.sendMessage(chatId, `ChatId guardado en la base de datos`);
+                      console.log("ChatId guardado en la base de datos");
                     } else {
-                      bot.sendMessage(chatId, 'No se pudo crear el ChatId. Por favor, inténtalo de nuevo.');
+                      console.log("No se pudo guardar chatId");
                     }
                   conversationState[chatId] = 'start';  // Cambiar el estado para seguir con el flujo del bot
 
@@ -219,7 +214,7 @@ bot.on('message', async (msg) => {
       case 'decisionUsuario':
         switch (userMessage) {
           case '1':
-               GetWorkshops()
+               GetTalleresByInteraction(chatId)
         .then(async (workshopsData) => {
 
           workshops = workshopsData; 
