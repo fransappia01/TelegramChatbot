@@ -18,7 +18,7 @@ let selectedWorkshopName;
 
 const bot = new TelegramBot(token, { polling: true });
 
-// Escucha cualquier tipo de mensaje
+// Escucha cualquier tipo de mensajes
 bot.on('message', async (msg) => {
 
   const chatId = msg.chat.id;
