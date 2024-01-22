@@ -14,6 +14,8 @@ app.listen(PORT, () => {
   console.log(`Server running at http://localhost:${PORT}`);
 });
 
+module.exports = app
+
 //Token .env
 const token = process.env.TELEGRAM_TOKEN;
 
@@ -271,4 +273,3 @@ process.on('uncaughtException', function (error) {
 	console.log("\x1b[31m", "Exception: ", error, "\x1b[0m");
 });
 
-module.exports = app
