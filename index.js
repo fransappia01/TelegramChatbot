@@ -3,19 +3,6 @@ const Taller = require('./Models/Talleres');
 const { GetStatusByAppointmentNumber, GetWorkshopsByLatLength, GetWorkshops, GetChatIdById, ValidateUserEmail, CreateChatId, GetUserNameByChatId, GetTalleresByInteraction, getSMSbyWorkshop } = require('./Functions/functions');
 require('dotenv').config();
 
-const express = require('express');
-
-const app = express();
-const PORT = 3000
-
-app.get('/', (req, res) => res.send('Home Page Route'));
-
-app.listen(PORT, () => {
-  console.log(`Server running at http://localhost:${PORT}`);
-});
-
-module.exports = app
-
 //Token .env
 const token = process.env.TELEGRAM_TOKEN;
 
