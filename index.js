@@ -3,6 +3,16 @@ const Taller = require('./Models/Talleres');
 const { GetStatusByAppointmentNumber, GetWorkshopsByLatLength, GetWorkshops, GetChatIdById, ValidateUserEmail, CreateChatId, GetUserNameByChatId, GetTalleresByInteraction, getSMSbyWorkshop } = require('./Functions/functions');
 require('dotenv').config();
 
+const express = require('express');
+
+const app = express();
+const PORT = 3000
+
+app.get('/', (req, res) => res.send('Home Page Route'));
+
+app.listen(PORT, () => {
+  console.log(`Server running at http://localhost:${PORT}`);
+});
 
 //Token .env
 const token = process.env.TELEGRAM_TOKEN;
@@ -260,3 +270,5 @@ bot.on('message', async (msg) => {
 process.on('uncaughtException', function (error) {
 	console.log("\x1b[31m", "Exception: ", error, "\x1b[0m");
 });
+
+module.exports = app
